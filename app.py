@@ -10,9 +10,13 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 def midi_to_lyric_template(midi_path, time_signature=(4, 4), rhyme_scheme="AABB", beat_threshold=0.75):
     pm = pretty_midi.PrettyMIDI(midi_path)
+
+    # Pick first non-drum instrument with notes
     melody = next((inst for inst in pm.instruments if (not inst.is_drum and inst.notes)), None)
     if melody is None:
         raise ValueError("No melodic notes found in MIDI.")
+
+    # Beat grid
     beats = pm.get_beats()
     if len(beats) < 2:
         raise ValueError("Could not compute beat grid.")
@@ -20,16 +24,22 @@ def midi_to_lyric_template(midi_path, time_signature=(4, 4), rhyme_scheme="AABB"
     avg_beat = sum(beat_durs) / len(beat_durs)
     sec_per_beat = avg_beat
     beats_per_bar = time_signature[0]
+
+    # Phrase segmentation by rests > 1 beat
     notes = sorted(melody.notes, key=lambda n: n.start)
     phrases, cur = [], []
     for i, note in enumerate(notes):
         if i > 0:
             gap = note.start - notes[i-1].end
             if gap > avg_beat:
-                if cur: phrases.append(cur)
+                if cur:
+                    phrases.append(cur)
                 cur = []
         cur.append(note)
-    if cur: phrases.append(cur)
+    if cur:
+        phrases.append(cur)
+
+    # Build templates
     templates = []
     for idx, phrase in enumerate(phrases):
         syllables, stress_slots, pos = 0, [], 1
@@ -40,11 +50,14 @@ def midi_to_lyric_template(midi_path, time_signature=(4, 4), rhyme_scheme="AABB"
             if dur_beats >= beat_threshold:
                 stressed = True
             else:
+                # Downbeats (1 & 3 in 4/4) treated as strong
                 beat_idx = int((n.start / sec_per_beat) % beats_per_bar) + 1
                 if beat_idx in (1, 3):
                     stressed = True
-            if stressed: stress_slots.append(pos)
+            if stressed:
+                stress_slots.append(pos)
             pos += 1
+
         rhyme_letter = rhyme_scheme[idx % len(rhyme_scheme)]
         templates.append({
             "phrase_index": idx + 1,
@@ -55,7 +68,7 @@ def midi_to_lyric_template(midi_path, time_signature=(4, 4), rhyme_scheme="AABB"
     return templates
 
 def build_prompt_text(templates, title, topic, mood, rhyme_scheme):
-    header = f\"""You are a professional lyricist. Write singable English lyrics that fit the given melody-derived template exactly.
+    header = f"""You are a professional lyricist. Write singable English lyrics that fit the given melody-derived template exactly.
 
 SYSTEM GOALS
 - Input: a prerecorded melody (already analyzed into a lyric template) + brief (title, topic, mood).
@@ -79,10 +92,13 @@ BRIEF
 - Rhyme Scheme: {rhyme_scheme}
 
 TEMPLATE:
-\"""
+"""
     lines = [header, ""]
     for t in templates:
-        lines.append(f"- Phrase {t['phrase_index']}: count={t['syllable_count']}, stress={t['stress_slots']}, rhyme={t['rhyme']}")
+        lines.append(
+            f"- Phrase {t['phrase_index']}: count={t['syllable_count']}, "
+            f"stress={t['stress_slots']}, rhyme={t['rhyme']}"
+        )
     lines += [
         "",
         "OUTPUT FORMAT:",
@@ -93,6 +109,8 @@ TEMPLATE:
     ]
     return "\n".join(lines)
 
+from flask import render_template  # ensure template import is present
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
@@ -100,22 +118,29 @@ def index():
         topic = (request.form.get('topic') or 'general').strip()
         mood  = (request.form.get('mood') or 'neutral').strip()
         rhyme_scheme = (request.form.get('rhyme_scheme') or 'AABB').strip().upper()
+
         f = request.files.get('midi_file')
         if not f or f.filename == '':
             return 'Please upload a .mid/.midi file.', 400
+
         safe_name = secure_filename(f.filename)
         midi_path = os.path.join(UPLOAD_DIR, safe_name)
         f.save(midi_path)
+
         try:
             templates = midi_to_lyric_template(midi_path, rhyme_scheme=rhyme_scheme)
         except Exception as e:
             return f'Error analyzing MIDI: {e}', 500
+
         prompt_text = build_prompt_text(templates, title, topic, mood, rhyme_scheme)
-        filename = f\"{title.replace(' ', '_')}_prompt.txt\"
+
+        filename = f"{title.replace(' ', '_')}_prompt.txt"
         out = io.BytesIO(prompt_text.encode('utf-8'))
         out.seek(0)
         return send_file(out, as_attachment=True, download_name=filename, mimetype='text/plain')
+
     return render_template('index.html')
 
 if __name__ == '__main__':
+    # Render uses PORT; default to 10000 for local run
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
