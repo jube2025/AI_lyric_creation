@@ -1,18 +1,10 @@
-# Melody to Lyrics Generator
+# MIDI → Lyric Prompt Builder
 
-This is a simple Flask web app that lets you upload a MIDI file and input song details (title, topic, mood).  
-It then generates lyrics using OpenAI's GPT API.
+Upload a lead‑melody MIDI and generate a structured prompt to paste into ChatGPT (or another LLM).
 
-## Setup
+## Run locally
+pip install -r requirements.txt
+python app.py
 
-1. Clone repo and install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. Run locally:
-   ```bash
-   flask run
-   ```
-
-3. Deploy on Render with `Procfile` and environment variable `OPENAI_API_KEY` set.
+## Deploy
+Use Procfile, no API keys required.

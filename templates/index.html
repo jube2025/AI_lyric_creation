@@ -1,20 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Lyric Generator</title>
+  <meta charset="utf-8">
+  <title>MIDI → Lyric Prompt Builder</title>
 </head>
 <body>
-  <h1>Generate Lyrics for Your Melody</h1>
+  <h1>MIDI → Lyric Prompt Builder</h1>
   <form method="POST" enctype="multipart/form-data">
-    <label>Song Title:</label><br>
-    <input type="text" name="title" required><br><br>
-    <label>Topic:</label><br>
-    <input type="text" name="topic" required><br><br>
-    <label>Mood:</label><br>
-    <input type="text" name="mood" required><br><br>
-    <label>Upload MIDI file:</label><br>
-    <input type="file" name="midi_file" accept=".mid"><br><br>
-    <button type="submit">Generate Lyrics</button>
+    <label>MIDI file:</label>
+    <input type="file" name="midi_file" accept=".mid,.midi" required><br>
+    <label>Rhyme Scheme:</label>
+    <input type="text" name="rhyme_scheme" value="AABB"><br>
+    <label>Song Title:</label>
+    <input type="text" name="title"><br>
+    <label>Topic:</label>
+    <input type="text" name="topic"><br>
+    <label>Mood:</label>
+    <input type="text" name="mood"><br>
+    <button type="submit">Generate Prompt (.txt)</button>
   </form>
 </body>
 </html>
